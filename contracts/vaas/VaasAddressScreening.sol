@@ -27,6 +27,9 @@ contract VaasAddressScreening is Ownable {
         vaasSignerAddress = _vaasSignerAddress;
     }
 
+    // set the amount of time in seconds, that a screening address response, will
+    // be valid. This field is used to validate the timestamp received in the api call.
+    // validation applyed: require((_vaasTimestamp + screeningTimeoutSeconds) > block.timestamp);
     function setScreeningTimeoutSeconds(uint256 _screeningTimeoutSeconds)
         external
         virtual
@@ -35,6 +38,8 @@ contract VaasAddressScreening is Ownable {
         screeningTimeoutSeconds = _screeningTimeoutSeconds;
     }
 
+    // if by any reason the contract owner wants to disable the validation,
+    // just et this var to true
     function setStopValidation(bool _stopValidation)
         external
         virtual
@@ -51,25 +56,18 @@ contract VaasAddressScreening is Ownable {
         uint256 _vaasTimestamp,
         bytes memory _vaasHashSignature
     ) public view returns (bool) {
+        // if the validation is disabled, always return true
+        if(stopValidation)
+            return true;
+
         require(_screenedAddress != address(0));
         require(
             (_vaasTimestamp + screeningTimeoutSeconds) > block.timestamp
         );
-        if(stopValidation)
-            return true;
 
         // re-create the hash using the screened address and the timestamp, previously called at the vaas API
-        bytes32 _messageHash = _getMessageHash(_screenedAddress, _vaasTimestamp);
+        bytes32 _messageHash = keccak256(abi.encodePacked(_screenedAddress, _vaasTimestamp));
         return _messageHash.toEthSignedMessageHash().recover(_vaasHashSignature) == vaasSignerAddress;            
-    }
- 
-
-    function _getMessageHash(address _from, uint256 _vaasTimestamp)
-        private
-        pure
-        returns (bytes32)
-    {
-        return keccak256(abi.encodePacked(_from, _vaasTimestamp));
     }
 
 }
